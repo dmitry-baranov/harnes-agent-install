@@ -13,6 +13,7 @@ The script installs Node.js 22 locally if Node 22+ is absent, OpenCode V2.3.2 si
 ## Finish setup locally
 
 ```fish
+if test -x "$HOME/.local/opt/harnes-node22/bin/node"; fish_add_path -U "$HOME/.local/opt/harnes-node22/bin"; end
 fish_add_path -U "$HOME/.local/bin"
 $HOME/.local/opt/harnes-opencode-v2/bin/opencode2 --version
 $HOME/.local/opt/harnes-opencode-v2/bin/opencode2 auth login openai
@@ -20,7 +21,7 @@ harnes-agent doctor
 harnes-agent workspace add /absolute/path/to/your/project
 ```
 
-If you already have a separate V2 executable, set `OPENCODE_V2_BIN` to its absolute path before installing and in your fish config for future shells. Use `~/.local/opt/harnes-node22/bin/node` if Node was installed locally and your shell still resolves an older global Node; add its `bin` to the fish path (`fish_add_path -U "$HOME/.local/opt/harnes-node22/bin"`).
+If you already have a separate V2 executable, set `OPENCODE_V2_BIN` to its absolute path before installing and in your fish config for future shells. The first command above adds locally installed Node.js to the fish path when applicable.
 
 On the Harnes site, generate a device code at `/devices`. Then on **this computer**:
 
