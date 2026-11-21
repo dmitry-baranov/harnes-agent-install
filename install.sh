@@ -2,9 +2,9 @@
 # Installs only for the current user. The agent archive is pinned to a tested release.
 set -eu
 
-release='v0.1.3'
-archive='harnes-agent-0.1.3-2026-11-21T02-23-12-257Z.tar.gz'
-archive_sha='39754eccdf377317ad26b23f7cbb85a2112b6e077e3df599f7f4538a77511da6'
+release='v0.1.4'
+archive='harnes-agent-0.1.4-2026-11-21T02-47-00-674Z.tar.gz'
+archive_sha='8bb9b14acf2afc6a8e2c572bf1abe30f2335cbb9b92c93b9751929ce18498d38'
 url="https://github.com/dmitry-baranov/harnes-agent-install/releases/download/$release/$archive"
 
 fail() { printf 'Harnes installer: %s\n' "$*" >&2; exit 1; }
@@ -80,14 +80,14 @@ old_version=''
 if [ -e "$agent_dir" ] || [ -L "$agent_dir" ]; then
   [ -f "$agent_dir/dist/index.js" ] || fail "$agent_dir already exists but is not a valid agent installation"
   old_version=$(node "$agent_dir/dist/index.js" --version)
-  case "$old_version" in 0.1.0|0.1.1|0.1.2|0.1.3) ;; *) fail 'An existing agent has a different version; upgrade it manually' ;; esac
+  case "$old_version" in 0.1.0|0.1.1|0.1.2|0.1.3|0.1.4) ;; *) fail 'An existing agent has a different version; upgrade it manually' ;; esac
 fi
-if [ "$old_version" != '0.1.3' ]; then
+if [ "$old_version" != '0.1.4' ]; then
   fetch "$url" "$work/agent.tar.gz"
   [ "$(checksum "$work/agent.tar.gz")" = "$archive_sha" ] || fail 'Agent archive checksum mismatch'
   tar -xzf "$work/agent.tar.gz" -C "$work"
   [ -f "$work/harnes-agent/dist/index.js" ] || fail 'Agent archive is incomplete'
-  [ "$(node "$work/harnes-agent/dist/index.js" --version)" = '0.1.3' ] || fail 'Unexpected agent version in archive'
+  [ "$(node "$work/harnes-agent/dist/index.js" --version)" = '0.1.4' ] || fail 'Unexpected agent version in archive'
   was_running=0
   if [ -n "$old_version" ]; then
     backup="$local_dir/share/harnes-agent.previous-$old_version"

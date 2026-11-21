@@ -5,10 +5,10 @@ Public installer for the device agent from the private [Harnes Remote](https://g
 **One command** in fish or a POSIX shell:
 
 ```fish
-curl -fsSL https://raw.githubusercontent.com/dmitry-baranov/harnes-agent-install/v0.1.3/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/dmitry-baranov/harnes-agent-install/v0.1.4/install.sh | sh
 ```
 
-The script installs Node.js 22 locally if Node 22+ is absent, OpenCode V2.3.2 side-by-side if needed, and a checksum-pinned standalone Harnes Agent. It upgrades an existing 0.1.0–0.1.2 installation while keeping a local backup and restarting its user service if already running. It locally authorizes the current user's home directory and everything beneath it; after enrollment, a ready-to-use **Home** workspace appears on the site without entering paths. Browse into a project from the site to start a session there; the agent stores project paths locally and the server stores only opaque identifiers. Other directories still require explicit local approval. It does not sign in, change OpenCode permissions or connect to a server automatically. It never sends local credentials or an absolute home path to the server. Inspect [install.sh](install.sh) before running it. Running the command again with the same version is supported.
+The script installs Node.js 22 locally if Node 22+ is absent, OpenCode V2.3.2 side-by-side if needed, and a checksum-pinned standalone Harnes Agent. It upgrades an existing 0.1.0–0.1.3 installation while keeping a local backup and restarting its user service if already running. It locally authorizes the current user's home directory and everything beneath it; after enrollment, a ready-to-use **Home** workspace appears on the site without entering paths. Browse into a project from the site to start a session there; the agent stores project paths locally and the server stores only opaque identifiers. If the computer is already paired with a different server, the same `harnes-agent enroll --server https://new-server` command creates a separate local identity and user service. Other directories still require explicit local approval. It does not sign in, change OpenCode permissions or connect to a server automatically. It never sends local credentials or an absolute home path to the server. Inspect [install.sh](install.sh) before running it. Running the command again with the same version is supported.
 
 ## Finish setup locally
 
