@@ -2,9 +2,9 @@
 # Installs only for the current user. The agent archive is pinned to a tested release.
 set -eu
 
-release='v0.1.0'
-archive='harnes-agent-0.1.0-2026-11-20T22-37-21-865Z.tar.gz'
-archive_sha='0d268cad799103ecb6f7516043723139c2355ec40eed48135865fb6dbaedf625'
+release='v0.1.1'
+archive='harnes-agent-0.1.1-2026-11-21T00-10-56-184Z.tar.gz'
+archive_sha='ce7f463d4a21420b7c71972a6f764c2b45c0f25abbeb4bab9db9aadcaf467616'
 url="https://github.com/dmitry-baranov/harnes-agent-install/releases/download/$release/$archive"
 
 fail() { printf 'Harnes installer: %s\n' "$*" >&2; exit 1; }
@@ -31,7 +31,8 @@ fetch() { curl -fLSs --retry 3 -o "$2" "$1"; }
 local_dir="$HOME/.local"
 mkdir -p "$local_dir/opt" "$local_dir/share"
 work=$(mktemp -d "$local_dir/.harnes-install.XXXXXXXX")
-trap 'rm -rf "$work"' EXIT HUP INT TERM
+trap 'code=$?; if [ "$code" -ne 0 ] && [ -n "${backup:-}" ] && [ -d "$backup" ]; then printf "Upgrade interrupted; previous agent preserved at %s. Check the user service before retrying.\n" "$backup" >&2; fi; rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
 
 # Use an existing compatible Node; otherwise install an official Node 22 archive locally.
 node_ok=0
@@ -75,18 +76,40 @@ else
 fi
 
 agent_dir="$local_dir/share/harnes-agent"
+old_version=''
 if [ -e "$agent_dir" ] || [ -L "$agent_dir" ]; then
   [ -f "$agent_dir/dist/index.js" ] || fail "$agent_dir already exists but is not a valid agent installation"
-  [ "$(node "$agent_dir/dist/index.js" --version)" = '0.1.0' ] || fail 'An existing agent has a different version; upgrade it manually'
-else
+  old_version=$(node "$agent_dir/dist/index.js" --version)
+  case "$old_version" in 0.1.0|0.1.1) ;; *) fail 'An existing agent has a different version; upgrade it manually' ;; esac
+fi
+if [ "$old_version" != '0.1.1' ]; then
   fetch "$url" "$work/agent.tar.gz"
   [ "$(checksum "$work/agent.tar.gz")" = "$archive_sha" ] || fail 'Agent archive checksum mismatch'
   tar -xzf "$work/agent.tar.gz" -C "$work"
   [ -f "$work/harnes-agent/dist/index.js" ] || fail 'Agent archive is incomplete'
+  [ "$(node "$work/harnes-agent/dist/index.js" --version)" = '0.1.1' ] || fail 'Unexpected agent version in archive'
+  was_running=0
+  if [ "$old_version" = '0.1.0' ]; then
+    backup="$local_dir/share/harnes-agent.previous-0.1.0"
+    [ ! -e "$backup" ] || fail "Backup $backup exists; preserve it before upgrading"
+    if [ "$os" = darwin ] && launchctl print "gui/$(id -u)/com.harnes.agent" >/dev/null 2>&1; then
+      launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.harnes.agent.plist"
+      was_running=1
+    elif [ "$os" = linux ] && command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet harnes-agent; then
+      systemctl --user stop harnes-agent
+      was_running=1
+    fi
+    mv "$agent_dir" "$backup"
+  fi
   mv "$work/harnes-agent" "$agent_dir"
 fi
 node "$agent_dir/dist/index.js" install
+if [ "${was_running:-0}" -eq 1 ]; then
+  if [ "$os" = darwin ]; then launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.harnes.agent.plist"
+  else systemctl --user daemon-reload && systemctl --user start harnes-agent; fi
+fi
 printf '\nInstalled Harnes Agent %s and OpenCode V2 for this user.\n' "$(node "$agent_dir/dist/index.js" --version)"
 printf 'Run: %s/bin/harnes-agent doctor\n' "$local_dir"
 if [ -x "$node_dir/bin/node" ]; then printf 'If needed, add %s/bin to your shell PATH.\n' "$node_dir"; fi
-printf 'Next: log in to your provider locally, then enroll with your HTTPS Harnes server. See README.\n'
+printf 'Home is locally approved. Once enrolled, a Home workspace appears on the site.\n'
+printf 'Next: log in to your provider locally, then enroll with your Harnes server. See README.\n'
