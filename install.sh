@@ -2,9 +2,9 @@
 # Installs only for the current user. The agent archive is pinned to a tested release.
 set -eu
 
-release='v0.1.1'
-archive='harnes-agent-0.1.1-2026-11-21T00-10-56-184Z.tar.gz'
-archive_sha='ce7f463d4a21420b7c71972a6f764c2b45c0f25abbeb4bab9db9aadcaf467616'
+release='v0.1.2'
+archive='harnes-agent-0.1.2-2026-11-21T00-36-31-018Z.tar.gz'
+archive_sha='fabf06732f3c057d4c060b66a5ae4d82e6bbcabee98abbd8959d8ebfdcf10e8a'
 url="https://github.com/dmitry-baranov/harnes-agent-install/releases/download/$release/$archive"
 
 fail() { printf 'Harnes installer: %s\n' "$*" >&2; exit 1; }
@@ -80,17 +80,17 @@ old_version=''
 if [ -e "$agent_dir" ] || [ -L "$agent_dir" ]; then
   [ -f "$agent_dir/dist/index.js" ] || fail "$agent_dir already exists but is not a valid agent installation"
   old_version=$(node "$agent_dir/dist/index.js" --version)
-  case "$old_version" in 0.1.0|0.1.1) ;; *) fail 'An existing agent has a different version; upgrade it manually' ;; esac
+  case "$old_version" in 0.1.0|0.1.1|0.1.2) ;; *) fail 'An existing agent has a different version; upgrade it manually' ;; esac
 fi
-if [ "$old_version" != '0.1.1' ]; then
+if [ "$old_version" != '0.1.2' ]; then
   fetch "$url" "$work/agent.tar.gz"
   [ "$(checksum "$work/agent.tar.gz")" = "$archive_sha" ] || fail 'Agent archive checksum mismatch'
   tar -xzf "$work/agent.tar.gz" -C "$work"
   [ -f "$work/harnes-agent/dist/index.js" ] || fail 'Agent archive is incomplete'
-  [ "$(node "$work/harnes-agent/dist/index.js" --version)" = '0.1.1' ] || fail 'Unexpected agent version in archive'
+  [ "$(node "$work/harnes-agent/dist/index.js" --version)" = '0.1.2' ] || fail 'Unexpected agent version in archive'
   was_running=0
-  if [ "$old_version" = '0.1.0' ]; then
-    backup="$local_dir/share/harnes-agent.previous-0.1.0"
+  if [ -n "$old_version" ]; then
+    backup="$local_dir/share/harnes-agent.previous-$old_version"
     [ ! -e "$backup" ] || fail "Backup $backup exists; preserve it before upgrading"
     if [ "$os" = darwin ] && launchctl print "gui/$(id -u)/com.harnes.agent" >/dev/null 2>&1; then
       launchctl bootout "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.harnes.agent.plist"
