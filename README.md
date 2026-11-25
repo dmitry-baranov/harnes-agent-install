@@ -49,3 +49,15 @@ Start the installed user service only after enrollment: macOS: `launchctl bootst
 The Home workspace works without adding a directory in the site. For other folders under home, type their absolute path into Workspaces; for folders outside home, run `harnes-agent workspace add` locally first.
 
 The control plane needs a reachable HTTPS deployment; its development Compose binds only to localhost. For server setup and architecture see [Harnes Remote](https://github.com/dmitry-baranov/harnes-remote) (repository access required).
+
+## Optional personal harness configuration (macOS and Linux)
+
+The installer now attempts to provision the private `agents` repository (harness-config) at `~/projects/harness-config` using existing authenticated Git access. Git is optional: if Git or private-repository access is missing, or local configuration conflicts, the agent still installs and pairing continues. No GitHub token is requested, embedded, relayed through the VPS or copied into configuration. Do not place credentials in clone URLs.
+
+Default profile: `personal`. Set `HARNES_CONFIG_PROFILE=backend`, `ml-research` or `devops` before running the installer to select a different profile. Set `HARNES_CONFIG=off` to skip this step. The checkout is pinned to a reviewed candidate commit in `refactor/harness-config`; existing checkouts are not reset or switched. The installer uses the pinned revision, not local edits. The temporary archive is removed on exit.
+
+Only global AGENTS.md and selected skills are installed into OpenCode's standard user config paths. The native OpenCode JSON/JSONC, provider login, permission settings, remote enrollment and existing full-access profile are not changed by this optional step. Existing unmanaged files and symlinks are not overwritten. Restart the V2 service when safe to load updated capabilities; the installer does not restart an unrelated existing OpenCode service.
+
+If the private repo is unavailable, authenticate GitHub locally (e.g. `gh auth login` if installed), then rerun the installer. If there is a conflict, inspect local configuration and use the harness-config migration guide; never blindly use --replace. The existing remote pairing process is unchanged.
+
+This integration is a candidate for testing before merging to main; the pinned revision is in a development branch. Real macOS/Linux installation and V2 skill discovery must be verified.

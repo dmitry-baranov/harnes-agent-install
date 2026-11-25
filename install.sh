@@ -103,7 +103,64 @@ if [ "$old_version" != '0.1.6' ]; then
   fi
   mv "$work/harnes-agent" "$agent_dir"
 fi
+
+install_harness_config() {
+  case "${HARNES_CONFIG:-auto}" in
+    off) printf 'Harness configuration disabled by HARNES_CONFIG=off.\n'; return 0 ;;
+    auto) ;;
+    *) printf 'Invalid HARNES_CONFIG; expected auto or off. Skipping configuration.\n' >&2; return 1 ;;
+  esac
+  if ! command -v git >/dev/null 2>&1; then
+    printf 'Git is not installed; skipping optional private harness configuration.\n' >&2
+    return 1
+  fi
+  config_repo='https://github.com/dmitry-baranov/agents.git'
+  config_branch='refactor/harness-config'
+  config_revision='2293a8144adcbb51a36edf7643e0cb385e761031'
+  config_target="$HOME/projects/harness-config"
+  config_profile="${HARNES_CONFIG_PROFILE:-personal}"
+  case "$config_profile" in
+    personal|backend|ml-research|devops) ;;
+    *) printf 'Unsupported remote harness profile: %s\n' "$config_profile" >&2; return 1 ;;
+  esac
+  if [ -e "$config_target" ] || [ -L "$config_target" ]; then
+    if [ -L "$config_target" ] || [ ! -d "$config_target/.git" ]; then
+      printf 'Existing harness path is not a regular Git checkout; left untouched: %s\n' "$config_target" >&2
+      return 1
+    fi
+    config_origin=$(git -C "$config_target" remote get-url origin 2>/dev/null) || return 1
+    case "$config_origin" in
+      "$config_repo"|git@github.com:dmitry-baranov/agents.git|ssh://git@github.com/dmitry-baranov/agents.git) ;;
+      *) printf 'Existing harness origin differs from the expected repository; left untouched.\n' >&2; return 1 ;;
+    esac
+    if ! git -C "$config_target" cat-file -e "$config_revision^{commit}" 2>/dev/null; then
+      GIT_TERMINAL_PROMPT=0 git -C "$config_target" fetch --no-tags origin "$config_branch" || return 1
+    fi
+  else
+    mkdir -p "$HOME/projects" || return 1
+    printf 'Fetching optional private harness configuration (existing Git credentials required).\n'
+    GIT_TERMINAL_PROMPT=0 git clone --no-checkout --branch "$config_branch" "$config_repo" "$work/harness-checkout" || return 1
+    git -C "$work/harness-checkout" checkout --detach "$config_revision" || return 1
+    [ ! -e "$config_target" ] && [ ! -L "$config_target" ] || return 1
+    mv "$work/harness-checkout" "$config_target" || return 1
+  fi
+  # Render from the pinned Git commit, not from potentially modified checkout files.
+  git -C "$config_target" archive --format=tar "$config_revision" > "$work/harness-config.tar" || return 1
+  mkdir "$work/harness-source" || return 1
+  tar -xf "$work/harness-config.tar" -C "$work/harness-source" || return 1
+  config_cli="$work/harness-source/harness/scripts/harness.mjs"
+  [ -f "$config_cli" ] || return 1
+  node "$config_cli" plan --runtime opencode --profile "$config_profile" --capabilities-only || return 1
+  node "$config_cli" sync --runtime opencode --profile "$config_profile" --capabilities-only || return 1
+  printf 'Harness capabilities installed (%s); checkout: %s\n' "$config_profile" "$config_target"
+  printf 'Existing OpenCode sessions/services may need a restart to load the new instructions and skills.\n'
+}
+
 node "$agent_dir/dist/index.js" install
+if ! install_harness_config; then
+  printf 'Optional harness configuration was not applied; the device agent installation continues.\n' >&2
+  printf 'Authenticate GitHub and review configuration conflicts before retrying; no --replace is used.\n' >&2
+fi
 if [ "${was_running:-0}" -eq 1 ]; then
   if [ "$os" = darwin ]; then launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.harnes.agent.plist"
   else systemctl --user daemon-reload && systemctl --user start harnes-agent; fi
