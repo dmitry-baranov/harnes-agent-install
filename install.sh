@@ -2,9 +2,10 @@
 # Installs only for the current user. The agent archive is pinned to a tested release.
 set -eu
 
-release='v0.1.6'
-archive='harnes-agent-0.1.6-2026-11-21T08-12-36-325Z.tar.gz'
-archive_sha='4c64725dcc957e1b9e2bff7ac0b0806f896024abc036a4b99d514ea9721154d1'
+version='0.1.7'
+release="v$version"
+archive='harnes-agent-0.1.7-2026-11-25T08-48-11-994Z.tar.gz'
+archive_sha='f6d6e36ae641c450b940a6370563aebd8c2f8bdba2115d0e9b21898b9e200b19'
 url="https://github.com/dmitry-baranov/harnes-agent-install/releases/download/$release/$archive"
 
 fail() { printf 'Harnes installer: %s\n' "$*" >&2; exit 1; }
@@ -80,14 +81,14 @@ old_version=''
 if [ -e "$agent_dir" ] || [ -L "$agent_dir" ]; then
   [ -f "$agent_dir/dist/index.js" ] || fail "$agent_dir already exists but is not a valid agent installation"
   old_version=$(node "$agent_dir/dist/index.js" --version)
-  case "$old_version" in 0.1.0|0.1.1|0.1.2|0.1.3|0.1.4|0.1.5|0.1.6) ;; *) fail 'An existing agent has a different version; upgrade it manually' ;; esac
+  case "$old_version" in 0.1.0|0.1.1|0.1.2|0.1.3|0.1.4|0.1.5|0.1.6|"$version") ;; *) fail 'An existing agent has a different version; upgrade it manually' ;; esac
 fi
-if [ "$old_version" != '0.1.6' ]; then
+if [ "$old_version" != "$version" ]; then
   fetch "$url" "$work/agent.tar.gz"
   [ "$(checksum "$work/agent.tar.gz")" = "$archive_sha" ] || fail 'Agent archive checksum mismatch'
   tar -xzf "$work/agent.tar.gz" -C "$work"
   [ -f "$work/harnes-agent/dist/index.js" ] || fail 'Agent archive is incomplete'
-  [ "$(node "$work/harnes-agent/dist/index.js" --version)" = '0.1.6' ] || fail 'Unexpected agent version in archive'
+  [ "$(node "$work/harnes-agent/dist/index.js" --version)" = "$version" ] || fail 'Unexpected agent version in archive'
   was_running=0
   if [ -n "$old_version" ]; then
     backup="$local_dir/share/harnes-agent.previous-$old_version"
@@ -112,10 +113,14 @@ printf '\nInstalled Harnes Agent %s and OpenCode V2 for this user.\n' "$(node "$
 printf 'Run: %s/bin/harnes-agent doctor\n' "$local_dir"
 if [ -x "$node_dir/bin/node" ]; then printf 'If needed, add %s/bin to your shell PATH.\n' "$node_dir"; fi
 printf 'Home is locally approved. Once enrolled, a Home workspace appears on the site.\n'
-printf 'Private harness-config provisioning requires a newer agent release and server support; this release does not fetch the private repository.\n'
 if [ -n "${HARNES_SERVER:-}" ]; then
-  [ -t 0 ] || fail 'Interactive pairing needs a terminal. Use sh -c "$(curl -fsSL URL)" instead of curl | sh.'
-  node "$agent_dir/dist/index.js" enroll --server "$HARNES_SERVER"
+  paired=$(node "$agent_dir/dist/index.js" status --server "$HARNES_SERVER" | node -e 'const s=JSON.parse(require("node:fs").readFileSync(0,"utf8")); if(s.deviceId && s.server===process.argv[1]) console.log("yes")' "$HARNES_SERVER")
+  if [ "$paired" != yes ]; then
+    [ -t 0 ] || fail 'Interactive pairing needs a terminal. Use the install-and-pair command from Devices instead of curl | sh.'
+    node "$agent_dir/dist/index.js" enroll --server "$HARNES_SERVER" --enable-local-execution
+  else
+    printf 'Already paired; existing identity, credentials and local execution setting preserved.\n'
+  fi
   # A second-server enrollment starts its own service inside the agent.
   if [ "$os" = darwin ]; then
     if ! launchctl print "gui/$(id -u)/com.harnes.agent" >/dev/null 2>&1; then
@@ -124,7 +129,7 @@ if [ -n "${HARNES_SERVER:-}" ]; then
   elif command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload && systemctl --user enable --now harnes-agent || fail 'Enrolled; start the primary user service manually'
   fi
-  printf 'Pairing complete. If auth was shared during approval, personal and world profiles are now installed.\n'
+  printf 'Open the device on the Harnes site to start a chat. If no provider credential is detected, sign in to OpenCode on this computer.\n'
 else
   printf 'Next: generate a pairing code on your Harnes site, then enroll with harnes-agent enroll --server https://your-server.\n'
 fi
